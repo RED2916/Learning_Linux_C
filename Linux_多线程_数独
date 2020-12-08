@@ -1,0 +1,200 @@
+/**
+ * Multithread solution for checking a Sudoku puzzle
+ * Solution to project 1
+ *
+ * Operating System Concepts - Ninth Edition
+ * Copyright John Wiley & Sons - 2013.
+ */
+
+#include <iostream>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define NUMBER_OF_THREADS 	18
+#define PUZZLE_SIZE 		9
+
+using namespace std;
+
+void* column_worker(void* param); 	/* thread that checks columns */
+void* row_worker(void* param); 		/* thread that checks rows */
+void* subfield_worker(void* param); 	/* thread that checks subfields */
+int judge_unique(int input[]); /*the function which is used to judge the array is satisfy or not*/
+
+/* example puzzle */
+int puzzle[PUZZLE_SIZE + 1][PUZZLE_SIZE + 1] = {
+			{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},
+			{-1,5,3,4,6,7,8,9,1,2},
+			{-1,6,7,2,1,9,5,3,4,8},
+			{-1,1,9,8,3,4,2,5,6,7},
+			{-1,8,5,9,7,6,1,4,2,3},
+			{-1,4,2,6,8,5,3,7,9,1},
+			{-1,7,1,3,9,2,4,8,5,6},
+			{-1,9,6,1,5,3,7,2,8,4},
+			{-1,2,8,7,4,1,9,6,3,5},
+			{-1,3,4,5,2,8,6,1,7,9}
+};
+
+int status_map[NUMBER_OF_THREADS] = { 0 };
+
+/* data structure for passing data to threads */
+typedef struct
+{
+	int thread_number;
+	int x;
+	int y;
+} parameters;
+
+int main(void)
+{
+	pthread_t threads[NUMBER_OF_THREADS];
+	pthread_attr_t attr;
+	int i;
+	int j;
+	int threads_num;
+	int rs;
+	int flag = 1;
+	void *status;
+	parameters input_para[NUMBER_OF_THREADS];
+	/* begin to create threads */
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	for (i = 0; i < PUZZLE_SIZE; i++) {
+		cout << "create threads： " << threads_num << endl;
+		input_para[threads_num].thread_number=threads_num;
+		input_para[threads_num].x=1;
+		input_para[threads_num].y=1+i;
+		rs = pthread_create(&threads[threads_num], NULL, row_worker, (void*)&input_para[threads_num]);//the result of creating
+		threads_num++;
+	}
+	//cout << "create threads： " << threads_num << endl;
+	//cout << j << i << endl;
+	/*pthread_attr_destroy(&attr);*/
+	/*cout << threads_num << endl;*/
+	/*pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);*/
+	for( i=0 ; i < 3 ; i++ ){
+		int j=0;//!!!!!!!pay attention!!!!!!
+		//cout << input_para[threads_num].y << endl;
+		//cout << "create threads： " << threads_num << endl;
+		//cout << j << i << endl;
+		for(j=0; j < 3; j++){
+		//cout << j << i << endl;
+		cout << "create threads： " << threads_num << endl;//problem here!
+		input_para[threads_num].thread_number=threads_num;
+		input_para[threads_num].x=1+j*3;
+		input_para[threads_num].y=1+i*3;
+		//cout << input_para[threads_num].x << endl;
+		//cout << "num:" << input_para[threads_num].thread_number << " x:" << input_para[threads_num].x <<" y:"<< input_para[threads_num].y  << endl;
+		rs = pthread_create(&threads[threads_num], NULL, subfield_worker, (void*)&input_para[threads_num]);//the result of creating
+		threads_num++;
+		}
+	}
+	pthread_attr_destroy(&attr);
+
+	for ( i = 0 ; i < PUZZLE_SIZE; i++) {
+		rs = pthread_join(threads[i],&status);
+		if (rs != 0) {
+			cout << "Error join!" << endl;
+			exit(-1);
+		}
+		cout << "completed threads : " << i << endl;
+	}
+	for (i = 0; i < NUMBER_OF_THREADS; i++) {
+		if (status_map[i] != 1) {
+			flag = 0;
+		}
+		cout << status_map[i] << ",";
+	}
+	if( flag == 1) {
+		cout << "Satisfy!" << endl;
+	}
+	else
+	{
+		cout << "NOT Satisfy!" << endl;
+	}
+	pthread_exit(NULL);
+	return 0;
+}
+
+void* row_worker(void* params)
+{
+	int i; //The paramater for loop
+	int output = 0;
+	parameters* params_used = (parameters*)params;
+	int input[PUZZLE_SIZE];
+	for (i = 0; i < PUZZLE_SIZE; i++) {
+		input[i] = puzzle[params_used->y][params_used->x + i];
+		/*cout << input[i] << endl;*/
+	}
+	output = judge_unique(input);
+	/*cout << output << endl;*/
+	status_map[params_used->thread_number] = output;
+	/*cout << params_used->thread_number << " : " << status_map[params_used->thread_number] << endl;*/
+	pthread_exit(0);
+}
+
+void* column_worker(void* params)
+{
+	int i; //The paramater for loop
+	int output = 0;
+	parameters* params_used = (parameters*)params;
+	int input[PUZZLE_SIZE];
+	for (i = 0; i < PUZZLE_SIZE; i++) {
+		input[i] = puzzle[params_used->y + i][params_used->x];
+	}
+	output = judge_unique(input);
+	status_map[params_used->thread_number] = output;
+	pthread_exit(0);
+}
+
+void* subfield_worker(void* params)
+{
+	int i; //The paramater for loop
+	int j;
+	int output = 0;
+	parameters* params_used = (parameters*)params;
+	int input[PUZZLE_SIZE];
+	//cout <<  "run:" << params_used->thread_number << endl;
+	for (i = 0; i < 3; i++) {
+		int j=0;//!!!!!!!pay attention!!!!!!
+		for (j = 0; j < 3; j++) {
+			/*cout << i*3+j << endl;*/
+			/*cout << (params_used->y) + i << ":" << (params_used->x) + j << endl;*/
+			input[i*3+j] = puzzle[params_used->y + i][params_used->x + j];
+		}
+	}
+	output = judge_unique(input);
+	status_map[params_used->thread_number] = output;
+	//cout <<  "end:" << params_used->thread_number << endl;
+	pthread_exit(0);
+}
+
+int judge_unique(int input[]) {
+	int i;
+	int flag = 0;
+	int judge[PUZZLE_SIZE] = { 0,0,0,0,0,0,0,0,0 };
+	for (i = 0; i < PUZZLE_SIZE; i++) {
+		if (input[i] < 1 || input[i]>9) {
+			cout << "Error input!" << endl;
+			return -1;
+		}
+		else {
+			judge[input[i] - 1] = 1;
+		}
+	}
+	for (i = 0; i < PUZZLE_SIZE; i++) {
+		if (judge[i] == 0) {
+			cout << i << endl;
+			flag = 1;//flag = 1 : it is not satify the puzzle
+		}
+	}
+	/*cout << flag << endl;*/
+	if (flag == 0) {
+		return 1;//1->sucess
+	}
+	else {
+		return 0;//0->fail
+	}
+}
